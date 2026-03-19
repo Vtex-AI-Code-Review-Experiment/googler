@@ -302,8 +302,8 @@ class Node(object):
         self.children = []  # type: List[Node]
 
         # Used in DOMBuilder.
-        self._partial = False
-        self._namespace = None  # type: Optional[str]
+        self.partial = False
+        self.namespace = None  # type: Optional[str]
 
     # HTML representation of the node. Meant to be implemented by
     # subclasses.
@@ -451,8 +451,6 @@ class Node(object):
         A :class:`RuntimeException` is raised if `root` is not in the
         ancestral chain.
         """
-        if self is root:
-            return
         ancestor = self.parent
         while ancestor is not root:
             if ancestor is None:
