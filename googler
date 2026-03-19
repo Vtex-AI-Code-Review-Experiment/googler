@@ -2683,17 +2683,16 @@ class Result(object):
         if colors:
             # Adjust index to print result index clearly
             print(" %s%s%-3s%s" % (' ' * indent, colors.index, index + '.', colors.reset), end='')
-            if not self.urlexpand:
-                print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
-            else:
-                print(' ' + colors.title + title + colors.reset)
-                print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        elif not self.urlexpand:
+            print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
         else:
-            if self.urlexpand:
-                print(' %s%-3s %s' % (' ' * indent, index + '.', title))
-                print(' %s%s' % (' ' * (indent + 4), url))
-            else:
-                print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
+            print(' ' + colors.title + title + colors.reset)
+            print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        if self.urlexpand:
+            print(' %s%-3s %s' % (' ' * indent, index + '.', title))
+            print(' %s%s' % (' ' * (indent + 4), url))
+        else:
+            print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
 
     def _print_metadata_and_abstract(self, abstract, metadata=None, matches=None, indent=0):
         colors = self.colors
