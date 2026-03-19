@@ -2898,8 +2898,8 @@ class GooglerCmd(object):
         # This method also sets self._results_filtered and
         # self._urltable.
         if self._preload_from_file:
-            with open(self._preload_from_file, encoding='utf-8') as fp:
-                page = fp.read()
+            fp = open(self._preload_from_file, encoding='utf-8')
+            page = fp.read()
         else:
             page = self._conn.fetch_page(self._google_url.relative())
             if logger.isEnabledFor(logging.DEBUG):
