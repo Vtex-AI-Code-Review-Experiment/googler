@@ -223,9 +223,9 @@ class TrackedTextwrap:
             self._coords.append((row, col))
         except AssertionError:
             raise RuntimeError(
-                "TrackedTextwrap: the impossible happened at offset {} of text {!r}".format(
-                    offset, self._original
-                )
+                f"WrapAroundError: {self.original} at text: {offset}"
+
+
             )
 
     # seq should be a zero-width sequence, e.g., an ANSI escape sequence.
