@@ -733,10 +733,38 @@ class DOMBuilder(HTMLParser):
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
         if self._namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
-            self.handle_starttag(tag, attrs)
+            node = ElementNode(tag, attrs)
+            node._partial = True
+            self._stack.append(node)
+            namespace = (
+                tag.lower()
+                if _tag_encloses_foreign_namespace(tag)
+                else self._namespace_stack[-1]  # Inherit parent namespace
+            )
+            node._namespace = namespace
+            self._namespace_stack.append(namespace)
+            # For void elements (not in a foreign context), immediately
+            # invoke the end tag handler (see handle_startendtag()).
+            if not namespace and _tag_is_void(tag):
+                self.handle_endtag(tag)
+
             self.handle_endtag(tag)
         else:
-            self.handle_starttag(tag, attrs)
+            node = ElementNode(tag, attrs)
+            node._partial = True
+            self._stack.append(node)
+            namespace = (
+                tag.lower()
+                if _tag_encloses_foreign_namespace(tag)
+                else self._namespace_stack[-1]  # Inherit parent namespace
+            )
+            node._namespace = namespace
+            self._namespace_stack.append(namespace)
+            # For void elements (not in a foreign context), immediately
+            # invoke the end tag handler (see handle_startendtag()).
+            if not namespace and _tag_is_void(tag):
+                self.handle_endtag(tag)
+
 
     def handle_data(self, text: str) -> None:
         if not self._stack:
