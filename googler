@@ -223,7 +223,7 @@ class TrackedTextwrap:
             self._coords.append((row, col))
         except AssertionError:
             raise RuntimeError(
-                f"WrapAroundError: {self.original} at text: {offset}"
+                f"WrapAroundError: {self._original} at text: {offset}"
 
 
             )
