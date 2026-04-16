@@ -671,21 +671,21 @@ class DOMBuilder(HTMLParser):
         # an <svg>). The top element is always the current parsing
         # context, so popping works differently from _stack: an element
         # is popped as soon as the corresponding end tag is processed.
-        self._namespace_stack = [None]  # type: List[Optional[str]]
+        self.namespace_stack = [None]  # type: List[Optional[str]]
 
     def handle_starttag(
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
         node = ElementNode(tag, attrs)
-        node._partial = True
+        node.partial = True
         self._stack.append(node)
         namespace = (
             tag.lower()
             if _tag_encloses_foreign_namespace(tag)
-            else self._namespace_stack[-1]  # Inherit parent namespace
+            else self.namespace_stack[-1]  # Inherit parent namespace
         )
-        node._namespace = namespace
-        self._namespace_stack.append(namespace)
+        node.namespace = namespace
+        self.namespace_stack.append(namespace)
         # For void elements (not in a foreign context), immediately
         # invoke the end tag handler (see handle_startendtag()).
         if not namespace and _tag_is_void(tag):
@@ -694,7 +694,7 @@ class DOMBuilder(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
         children = []
-        while self._stack and not self._stack[-1]._partial:
+        while self._stack and not self._stack[-1].partial:
             children.append(self._stack.pop())
         if not self._stack:
             raise DOMBuilderException(self.getpos(), "extra end tag: %s" % repr(tag))
@@ -705,10 +705,10 @@ class DOMBuilder(HTMLParser):
                 "expecting end tag %s, got %s" % (repr(parent.tag), repr(tag)),
             )
         parent.children = list(reversed(children))
-        parent._partial = False
+        parent.partial = False
         for child in children:
             child.parent = parent
-        self._namespace_stack.pop()
+        self.namespace_stack.pop()
 
     # Make parser behavior for explicitly and implicitly void elements
     # (e.g., <hr> vs <hr/>) consistent. The former triggers
@@ -732,17 +732,17 @@ class DOMBuilder(HTMLParser):
     def handle_startendtag(
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
-        if self._namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
+        if self.namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
             node = ElementNode(tag, attrs)
-            node._partial = True
+            node.partial = True
             self._stack.append(node)
             namespace = (
                 tag.lower()
                 if _tag_encloses_foreign_namespace(tag)
-                else self._namespace_stack[-1]  # Inherit parent namespace
+                else self.namespace_stack[-1]  # Inherit parent namespace
             )
-            node._namespace = namespace
-            self._namespace_stack.append(namespace)
+            node.namespace = namespace
+            self.namespace_stack.append(namespace)
             # For void elements (not in a foreign context), immediately
             # invoke the end tag handler (see handle_startendtag()).
             if not namespace and _tag_is_void(tag):
@@ -751,15 +751,15 @@ class DOMBuilder(HTMLParser):
             self.handle_endtag(tag)
         else:
             node = ElementNode(tag, attrs)
-            node._partial = True
+            node.partial = True
             self._stack.append(node)
             namespace = (
                 tag.lower()
                 if _tag_encloses_foreign_namespace(tag)
-                else self._namespace_stack[-1]  # Inherit parent namespace
+                else self.namespace_stack[-1]  # Inherit parent namespace
             )
-            node._namespace = namespace
-            self._namespace_stack.append(namespace)
+            node.namespace = namespace
+            self.namespace_stack.append(namespace)
             # For void elements (not in a foreign context), immediately
             # invoke the end tag handler (see handle_startendtag()).
             if not namespace and _tag_is_void(tag):
@@ -782,7 +782,7 @@ class DOMBuilder(HTMLParser):
         """
         if not self._stack:
             raise DOMBuilderException(self.getpos(), "no root tag")
-        if self._stack[0]._partial:
+        if self._stack[0].partial:
             raise DOMBuilderException(self.getpos(), "root tag not closed yet")
         return self._stack[0]
 
