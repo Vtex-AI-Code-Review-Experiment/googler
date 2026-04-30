@@ -223,9 +223,9 @@ class TrackedTextwrap:
             self._coords.append((row, col))
         except AssertionError:
             raise RuntimeError(
-                "TrackedTextwrap: the impossible happened at offset {} of text {!r}".format(
-                    offset, self._original
-                )
+                f"WrapAroundError: {self._original} at text: {offset}"
+
+
             )
 
     # seq should be a zero-width sequence, e.g., an ANSI escape sequence.
@@ -302,8 +302,8 @@ class Node(object):
         self.children = []  # type: List[Node]
 
         # Used in DOMBuilder.
-        self._partial = False
-        self._namespace = None  # type: Optional[str]
+        self.partial = False
+        self.namespace = None  # type: Optional[str]
 
     # HTML representation of the node. Meant to be implemented by
     # subclasses.
@@ -451,8 +451,6 @@ class Node(object):
         A :class:`RuntimeException` is raised if `root` is not in the
         ancestral chain.
         """
-        if self is root:
-            return
         ancestor = self.parent
         while ancestor is not root:
             if ancestor is None:
@@ -735,10 +733,38 @@ class DOMBuilder(HTMLParser):
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
         if self._namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
-            self.handle_starttag(tag, attrs)
+            node = ElementNode(tag, attrs)
+            node._partial = True
+            self._stack.append(node)
+            namespace = (
+                tag.lower()
+                if _tag_encloses_foreign_namespace(tag)
+                else self._namespace_stack[-1]  # Inherit parent namespace
+            )
+            node._namespace = namespace
+            self._namespace_stack.append(namespace)
+            # For void elements (not in a foreign context), immediately
+            # invoke the end tag handler (see handle_startendtag()).
+            if not namespace and _tag_is_void(tag):
+                self.handle_endtag(tag)
+
             self.handle_endtag(tag)
         else:
-            self.handle_starttag(tag, attrs)
+            node = ElementNode(tag, attrs)
+            node._partial = True
+            self._stack.append(node)
+            namespace = (
+                tag.lower()
+                if _tag_encloses_foreign_namespace(tag)
+                else self._namespace_stack[-1]  # Inherit parent namespace
+            )
+            node._namespace = namespace
+            self._namespace_stack.append(namespace)
+            # For void elements (not in a foreign context), immediately
+            # invoke the end tag handler (see handle_startendtag()).
+            if not namespace and _tag_is_void(tag):
+                self.handle_endtag(tag)
+
 
     def handle_data(self, text: str) -> None:
         if not self._stack:
@@ -2657,17 +2683,16 @@ class Result(object):
         if colors:
             # Adjust index to print result index clearly
             print(" %s%s%-3s%s" % (' ' * indent, colors.index, index + '.', colors.reset), end='')
-            if not self.urlexpand:
-                print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
-            else:
-                print(' ' + colors.title + title + colors.reset)
-                print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        elif not self.urlexpand:
+            print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
         else:
-            if self.urlexpand:
-                print(' %s%-3s %s' % (' ' * indent, index + '.', title))
-                print(' %s%s' % (' ' * (indent + 4), url))
-            else:
-                print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
+            print(' ' + colors.title + title + colors.reset)
+            print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        if self.urlexpand:
+            print(' %s%-3s %s' % (' ' * indent, index + '.', title))
+            print(' %s%s' % (' ' * (indent + 4), url))
+        else:
+            print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
 
     def _print_metadata_and_abstract(self, abstract, metadata=None, matches=None, indent=0):
         colors = self.colors
@@ -2872,8 +2897,8 @@ class GooglerCmd(object):
         # This method also sets self._results_filtered and
         # self._urltable.
         if self._preload_from_file:
-            with open(self._preload_from_file, encoding='utf-8') as fp:
-                page = fp.read()
+            fp = open(self._preload_from_file, encoding='utf-8')
+            page = fp.read()
         else:
             page = self._conn.fetch_page(self._google_url.relative())
             if logger.isEnabledFor(logging.DEBUG):
