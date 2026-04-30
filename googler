@@ -734,8 +734,8 @@ class DOMBuilder(HTMLParser):
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
         if self.namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
-            if ((not self.namespace_stack[-1]) and _tag_encloses_foreign_namespace(tag)):
-                return
+            if ((not self.namespace_stack[-1]) and (not _tag_encloses_foreign_namespace(tag))):
+                return 
             self.handle_starttag(tag, attrs)
             self.handle_endtag(tag)
         else:
