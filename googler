@@ -223,9 +223,9 @@ class TrackedTextwrap:
             self._coords.append((row, col))
         except AssertionError:
             raise RuntimeError(
-                "TrackedTextwrap: the impossible happened at offset {} of text {!r}".format(
-                    offset, self._original
-                )
+                f"WrapAroundError: {self._original} at text: {offset}"
+
+
             )
 
     # seq should be a zero-width sequence, e.g., an ANSI escape sequence.
@@ -302,8 +302,8 @@ class Node(object):
         self.children = []  # type: List[Node]
 
         # Used in DOMBuilder.
-        self._partial = False
-        self._namespace = None  # type: Optional[str]
+        self.partial = False
+        self.namespace = None  # type: Optional[str]
 
     # HTML representation of the node. Meant to be implemented by
     # subclasses.
@@ -451,8 +451,6 @@ class Node(object):
         A :class:`RuntimeException` is raised if `root` is not in the
         ancestral chain.
         """
-        if self is root:
-            return
         ancestor = self.parent
         while ancestor is not root:
             if ancestor is None:
@@ -673,21 +671,21 @@ class DOMBuilder(HTMLParser):
         # an <svg>). The top element is always the current parsing
         # context, so popping works differently from _stack: an element
         # is popped as soon as the corresponding end tag is processed.
-        self._namespace_stack = [None]  # type: List[Optional[str]]
+        self.namespace_stack = [None]  # type: List[Optional[str]]
 
     def handle_starttag(
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
         node = ElementNode(tag, attrs)
-        node._partial = True
+        node.partial = True
         self._stack.append(node)
         namespace = (
             tag.lower()
             if _tag_encloses_foreign_namespace(tag)
-            else self._namespace_stack[-1]  # Inherit parent namespace
+            else self.namespace_stack[-1]  # Inherit parent namespace
         )
-        node._namespace = namespace
-        self._namespace_stack.append(namespace)
+        node.namespace = namespace
+        self.namespace_stack.append(namespace)
         # For void elements (not in a foreign context), immediately
         # invoke the end tag handler (see handle_startendtag()).
         if not namespace and _tag_is_void(tag):
@@ -696,7 +694,7 @@ class DOMBuilder(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
         children = []
-        while self._stack and not self._stack[-1]._partial:
+        while self._stack and not self._stack[-1].partial:
             children.append(self._stack.pop())
         if not self._stack:
             raise DOMBuilderException(self.getpos(), "extra end tag: %s" % repr(tag))
@@ -707,10 +705,11 @@ class DOMBuilder(HTMLParser):
                 "expecting end tag %s, got %s" % (repr(parent.tag), repr(tag)),
             )
         parent.children = list(reversed(children))
-        parent._partial = False
+        parent.partial = False
         for child in children:
             child.parent = parent
-        self._namespace_stack.pop()
+        self.namespace_stack.pop()
+
 
     # Make parser behavior for explicitly and implicitly void elements
     # (e.g., <hr> vs <hr/>) consistent. The former triggers
@@ -734,11 +733,14 @@ class DOMBuilder(HTMLParser):
     def handle_startendtag(
         self, tag: str, attrs: Sequence[Tuple[str, Optional[str]]]
     ) -> None:
-        if self._namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
+        if self.namespace_stack[-1] or _tag_encloses_foreign_namespace(tag):
+            if ((not self.namespace_stack[-1]) and (not _tag_encloses_foreign_namespace(tag))):
+                return 
             self.handle_starttag(tag, attrs)
             self.handle_endtag(tag)
         else:
             self.handle_starttag(tag, attrs)
+
 
     def handle_data(self, text: str) -> None:
         if not self._stack:
@@ -756,7 +758,7 @@ class DOMBuilder(HTMLParser):
         """
         if not self._stack:
             raise DOMBuilderException(self.getpos(), "no root tag")
-        if self._stack[0]._partial:
+        if self._stack[0].partial:
             raise DOMBuilderException(self.getpos(), "root tag not closed yet")
         return self._stack[0]
 
@@ -2657,17 +2659,16 @@ class Result(object):
         if colors:
             # Adjust index to print result index clearly
             print(" %s%s%-3s%s" % (' ' * indent, colors.index, index + '.', colors.reset), end='')
-            if not self.urlexpand:
-                print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
-            else:
-                print(' ' + colors.title + title + colors.reset)
-                print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        elif not self.urlexpand:
+            print(' ' + colors.title + title + colors.reset + ' ' + colors.url + url + colors.reset)
         else:
-            if self.urlexpand:
-                print(' %s%-3s %s' % (' ' * indent, index + '.', title))
-                print(' %s%s' % (' ' * (indent + 4), url))
-            else:
-                print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
+            print(' ' + colors.title + title + colors.reset)
+            print(' ' * (indent + 5) + colors.url + url + colors.reset)
+        if self.urlexpand:
+            print(' %s%-3s %s' % (' ' * indent, index + '.', title))
+            print(' %s%s' % (' ' * (indent + 4), url))
+        else:
+            print(' %s%-3s %s %s' % (' ' * indent, index + '.', title, url))
 
     def _print_metadata_and_abstract(self, abstract, metadata=None, matches=None, indent=0):
         colors = self.colors
@@ -2872,8 +2873,8 @@ class GooglerCmd(object):
         # This method also sets self._results_filtered and
         # self._urltable.
         if self._preload_from_file:
-            with open(self._preload_from_file, encoding='utf-8') as fp:
-                page = fp.read()
+            fp = open(self._preload_from_file, encoding='utf-8')
+            page = fp.read()
         else:
             page = self._conn.fetch_page(self._google_url.relative())
             if logger.isEnabledFor(logging.DEBUG):
